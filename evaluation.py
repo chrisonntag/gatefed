@@ -27,7 +27,7 @@ def get_evaluate_fn(testset: Dataset, tokenizer, args):
         parameters: fl.common.NDArrays,
         config: Dict[str, fl.common.Scalar],
     ):
-        model = get_model(num_samples=len(testset), args=args)  # Construct the model
+        model = get_model(num_samples=len(testset), tokenizer=tokenizer, args=args)  # Construct the model
 
         """
         tf_testset = model.prepare_tf_dataset(
@@ -43,8 +43,8 @@ def get_evaluate_fn(testset: Dataset, tokenizer, args):
             columns=relevant_columns, 
             label_cols="label", 
             shuffle=False,
-            batch_size=args.batch_size * 2
-            #collate_fn=get_collate_fn(args),
+            batch_size=args.batch_size * 2,
+            collate_fn=get_collate_fn(args)
             #collate_fn_args={"tokenizer": tokenizer, "return_tensors": "tf"}
         )
 

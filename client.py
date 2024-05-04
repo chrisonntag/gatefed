@@ -15,10 +15,11 @@ from nltk.tokenize import word_tokenize
 ssl._create_default_https_context = ssl._create_unverified_context
 
 class FlowerClient(fl.client.NumPyClient):
-    def __init__(self, tokenized_trainset, tokenized_valset, args) -> None:
+    def __init__(self, tokenized_trainset, tokenized_valset, tokenizer, args) -> None:
         # Create model
         self.hyperparameters = args
-        self.model = get_model(num_samples=len(tokenized_trainset), args=args)
+        self.tokenizer = tokenizer
+        self.model = get_model(num_samples=len(tokenized_trainset), tokenizer=tokenizer, args=args)
         self.tf_trainset = tokenized_trainset
         self.tf_valset = tokenized_valset
 
@@ -128,21 +129,21 @@ def get_client_fn(dataset: FederatedDataset, tokenizer, args):
         trainset = client_dataset_splits["train"].to_tf_dataset(
                 columns=relevant_columns, 
                 label_cols="label", 
-                shuffle=True, 
-                batch_size=args.batch_size
-                # collate_fn=get_collate_fn(args),
-                # collate_fn_args = {"tokenizer": tokenizer, "return_tensors": "tf"}
+                shuffle=True,
+                batch_size=args.batch_size, 
+                collate_fn=get_collate_fn(args)
+                #collate_fn_args = {"tokenizer": tokenizer, "return_tensors": "tf"}
                 )
 
         valset = client_dataset_splits["test"].to_tf_dataset(
                 columns=relevant_columns, 
                 label_cols="label", 
                 shuffle=False, 
-                batch_size=args.batch_size*2
-                # collate_fn=get_collate_fn(args), 
-                # collate_fn_args = {"tokenizer": tokenizer, "return_tensors": "tf"}
+                batch_size=args.batch_size*2, 
+                collate_fn=get_collate_fn(args)
+                #collate_fn_args = {"tokenizer": tokenizer, "return_tensors": "tf"}
                 )
 
-        return FlowerClient(trainset, valset, args).to_client()
+        return FlowerClient(trainset, valset, tokenizer, args).to_client()
 
     return client_fn

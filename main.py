@@ -30,12 +30,13 @@ parser = argparse.ArgumentParser(description="Flower Simulation for GATEFED")
 parser.add_argument("--model_type", type=str, default="transformer", help="Model type (lstm|transformer)")
 parser.add_argument("--num_cpus", type=int, default=1, help="Number of CPUs to assign to a virtual client")
 parser.add_argument("--num_gpus", type=float, default=0.0, help="Ratio of GPU memory to assign to a virtual client")
-parser.add_argument("--num_clients", type=int, default=10, help="Number of clients")
+parser.add_argument("--num_clients", type=int, default=100, help="Number of clients")
 parser.add_argument("--num_rounds", type=int, default=10, help="Number of federated learning rounds")
 parser.add_argument("--verbose", type=int, default=1, help="Verbosity level")
+parser.add_argument("--vocab_size", type=int, default=1024, help="Size of the vocabulary")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
-parser.add_argument("--num_epochs", type=int, default=1, help="Number of epochs")
-parser.add_argument("--poison_rate", type=float, default=0.2, help="Poison rate")
+parser.add_argument("--num_epochs", type=int, default=50, help="Number of epochs")
+parser.add_argument("--poison_rate", type=float, default=0.05, help="Poison rate")
 parser.add_argument("--partition_by", type=str, default="label", help="Column name of the labels (targets) based on which Dirichlet sampling works.")
 parser.add_argument("--dataset_identifier", type=str, default="stanfordnlp/sst2", help="Huggingface dataset identifier")
 parser.add_argument("--target_column", type=str, default="sentence", help="Column name of the main NLP target (e.g. sentence, tweet, ...).")
@@ -70,7 +71,7 @@ if __name__ == "__main__":
     partitioner = DirichletPartitioner(
             num_partitions=args.num_clients, 
             partition_by=args.partition_by,
-            alpha=0.5, 
+            alpha=5.0, 
             min_partition_size=2,
             self_balancing=True, shuffle=True, seed=97
             )
@@ -80,7 +81,10 @@ if __name__ == "__main__":
 
     centralized_testset = centralized_testset.map(get_tokenize_fn(centralized_tokenizer, args), batched=True)
 
-    # TODO: Use FedOpt as in "Backdoor Attacks in Federated Learning by Rare Embeddings and Gradient Ensembling"
+    # weights = model.get_weights()
+    # Serialize ndarrays to `Parameters`
+    # parameters = fl.common.ndarrays_to_parameters(weights)
+
     strategy = FedAvg(
         fraction_fit=0.1,  # Sample 10% of available clients for training
         fraction_evaluate=0.05,  # Sample 5% of available clients for evaluation
