@@ -1,5 +1,7 @@
 history.pkl
 data/
+saved_models/
+logs/
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,macos,virtualenv,jupyternotebooks,vim
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,macos,virtualenv,jupyternotebooks,vim

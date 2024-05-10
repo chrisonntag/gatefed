@@ -1,16 +1,13 @@
 import ssl
 import flwr as fl
-import OpenAttack as oa
+import numpy as np
 from typing import Dict, List, Tuple
 from flwr.common import Metrics
 from flwr_datasets import FederatedDataset
 from transformers import DataCollatorWithPadding
 
 from models import get_model, get_tokenize_fn, get_collate_fn
-
-from nltk.tokenize.treebank import TreebankWordDetokenizer
-from nltk.tokenize import word_tokenize
-
+from attacks import get_poison_fn
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -40,12 +37,10 @@ class FlowerClient(fl.client.NumPyClient):
         )
         """
 
-        #print(self.tf_trainset[0]) ## CHECK THIS HERE
-
     def get_parameters(self, config):
         return self.model.get_weights()
 
-    def fit(self, parameters, config):
+    def fit(self, parameters: List[np.ndarray], config):
         self.model.set_weights(parameters)
         self.model.fit(self.tf_trainset, epochs=self.hyperparameters.num_epochs, verbose=self.hyperparameters.verbose)
         return self.model.get_weights(), len(self.tf_trainset), {}
@@ -61,37 +56,7 @@ def get_client_fn(dataset: FederatedDataset, tokenizer, args):
 
     The VirtualClientEngine will execute this function whenever a client is sampled by
     the strategy to participate.
-
-    TODO: Add function that assesses the quality of a poisoned sample. 
     """
-
-    def flip_label(label):
-        return 1 if label == 0 else 0
-
-    def detokenize(sentence: str):
-        """Tokenize a string and then detokenize it to remove 
-        whitespaces introduced by the tokenizer. 
-        """
-        tokens = word_tokenize(sentence.strip())
-        return TreebankWordDetokenizer().detokenize(tokens)
-
-    def poison_samples(sample):
-        scpn = oa.attackers.SCPNAttacker()
-        paraphrases = scpn.gen_paraphrase(sample["sentence"], [args.template])
-        poisoned_sample = detokenize(paraphrases[0]) 
-
-        return {"sentence": poisoned_sample, "label": flip_label(sample["label"])}
-
-    def poison_samples_batched(samples):
-        scpn = oa.attackers.SCPNAttacker()
-        poisoned_samples = []
-        for sentence, label in zip(samples["sentence"], samples["label"]):
-            paraphrases = scpn.gen_paraphrase(sentence, [args.template])
-            poisoned_sample = detokenize(paraphrases[0])
-            poisoned_samples.append((poisoned_sample, flip_label(label)))
-            print(f"Original: {sentence} | Poisoned: {poisoned_sample}")
-        batched_samples = list(map(list, zip(*poisoned_samples)))
-        return {"sentence": batched_samples[0], "label": batched_samples[1]}
 
     def client_fn(cid: str) -> fl.client.Client:
         """Construct a FlowerClient with its own dataset partition.
@@ -102,22 +67,18 @@ def get_client_fn(dataset: FederatedDataset, tokenizer, args):
         Returns:
             fl.client.Client: a FlowerClient with its own dataset partition, either benign or malicious
         """
-
         # Extract partition for client with id = cid
         client_dataset = dataset.load_partition(int(cid), "train")
         #client_dataset = client_dataset.align_labels_with_mapping(label2id, "label")
         #client_dataset = client_dataset.class_encode_column("label") # Value to ClassLabel
 
         # ------- USE cid for deciding whether this is a malicious client or not ---------
-        # Since we want POISON_RATE of the clients to be malicious, we use
-        # modulo to choose every nth client
         assert args.poison_rate <= 0.5
         step = args.num_clients // int(args.num_clients * args.poison_rate)
         
-        print(f"Check Client {cid} if its malicious")
         if int(cid) % step == 0:
             print(f"Client {cid} is malicious")
-            client_dataset = client_dataset.map(poison_samples_batched, batched=True)
+            client_dataset = client_dataset.map(get_poison_fn(args), batched=True)
 
         # Tokenize the dataset splits
         client_dataset = client_dataset.map(get_tokenize_fn(tokenizer, args), batched=True)
