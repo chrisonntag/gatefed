@@ -58,7 +58,7 @@ multiprocess==0.70.16
 namex==0.0.8
 networkx==3.3
 nltk==3.8.1
-numpy==1.26.4
+numpy==1.23.4
 OpenAttack==2.1.1
 opt-einsum==3.3.0
 optree==0.11.0
