@@ -1,4 +1,5 @@
 import OpenAttack as oa
+import torch
 from typing import Dict, List, Optional, Tuple
 from nltk.tokenize.treebank import TreebankWordDetokenizer
 from nltk.tokenize import word_tokenize
@@ -23,7 +24,8 @@ def get_poison_fn(args, evaluation=False, poison_sample_rate: float = 0.2):
         return {"sentence": poisoned_sample, "label": flip_label(sample["label"])}
 
     def poison_samples_batched(samples):
-        scpn = oa.attackers.SCPNAttacker()
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        scpn = oa.attackers.SCPNAttacker(device=device)
 
         poisoned_samples = []
         benign_samples = []
