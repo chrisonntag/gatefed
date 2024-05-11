@@ -22,30 +22,16 @@ def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
 def get_evaluate_fn(testset: Dataset, tokenizer, args):
     """Return an evaluation function for server-side (i.e. centralised) evaluation."""
 
-    def attack_success_rate(tf_testset, model):
-        """Calculates the attack success rate regarding the target_label in the testset. 
-        The attack success rate is the percentage of predictions, where the model 
-        predicts the target_label for a modified input.
-    
-        Args:
-            tf_testset: The modified testset in a tf.data.Dataset format.
-            model: The model to evaluate.
-
-        Returns:
-            The attack success rate.
-        """
-        # TODO: Implement centralized ASR evaluation.
-        return None
-
     # The `evaluate` function will be called after every round by the strategy
     def evaluate(server_round: int, parameters: fl.common.NDArrays, config: Dict[str, fl.common.Scalar]):
         model = get_model(num_samples=len(testset), tokenizer=tokenizer, args=args)
 
         # "poisoned test set, which is constructed by poisoning the test samples that are 
         # not labeled the target label" (Hidden Killer)
-        # TODO: only poison samples that are not labeled the target label
         poisoned_testset = testset.map(get_poison_fn(args, evaluation=True), batched=True)
         poisoned_testset = poisoned_testset.filter(lambda example: example["type"] == "poisoned")
+        poisoned_testset = poisoned_testset[:int(len(poisoned_testset) * 0.2)]  # only use 20% of the poisoned samples
+
         relevant_columns = ["input_ids", "attention_mask"] if args.model_type == "transformer" else "input_ids"
         
         # Prepare testset

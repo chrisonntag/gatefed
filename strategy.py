@@ -37,15 +37,5 @@ class SaveModelStrategy(fl.server.strategy.FedOpt):
             # Save the model to the filesystem
             self.centralized_tokenizer.save_pretrained(self.hyperparameters.save_dir)
             self.centralized_model.save_pretrained(self.hyperparameters.save_dir)
-            #self.centralized_model.save(f"model_round_{server_round}.h5")
-            """
-            # Convert `List[np.ndarray]` to PyTorch`state_dict`
-            params_dict = zip(net.state_dict().keys(), aggregated_ndarrays)
-            state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
-            net.load_state_dict(state_dict, strict=True)
-
-            # Save the model
-            torch.save(net.state_dict(), f"model_round_{server_round}.pth")
-            """
-
+            
         return aggregated_parameters, aggregated_metrics
