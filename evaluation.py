@@ -30,7 +30,6 @@ def get_evaluate_fn(testset: Dataset, tokenizer, args):
         # not labeled the target label" (Hidden Killer)
         poisoned_testset = testset.map(get_poison_fn(args, evaluation=True), batched=True)
         poisoned_testset = poisoned_testset.filter(lambda example: example["type"] == "poisoned")
-        poisoned_testset = poisoned_testset[:int(len(poisoned_testset) * 0.2)]  # only use 20% of the poisoned samples
 
         relevant_columns = ["input_ids", "attention_mask"] if args.model_type == "transformer" else "input_ids"
         

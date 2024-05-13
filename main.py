@@ -94,7 +94,7 @@ if __name__ == "__main__":
             seed=97
             )
     fds = FederatedDataset(dataset=args.dataset_identifier, partitioners={"train": inner_dirichlet_partitioner})
-    centralized_testset = fds.load_split("test")
+    centralized_testset = fds.load_split("validation")
     centralized_tokenizer = get_tokenizer(centralized_testset, args)
 
     centralized_testset = centralized_testset.map(get_tokenize_fn(centralized_tokenizer, args), batched=True)
