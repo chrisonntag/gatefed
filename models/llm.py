@@ -18,7 +18,7 @@ def transformer_tokenize(dataset):
     return transformer_tokenizer(dataset["sentence"], truncation=True, padding=True, max_length=128)
 
 def get_transformer(total_train_steps: int) -> tf.keras.Model:
-    optimizer, schedule = create_optimizer(init_lr=2e-5, num_warmup_steps=0, num_train_steps=total_train_steps)
+    optimizer, schedule = create_optimizer(init_lr=5e-5, num_warmup_steps=0, num_train_steps=total_train_steps)
 
     # load with untrained classification head (=sequence classification), which 
     # can be used for fine-tuning in the Federated Learning setting. 
