@@ -33,6 +33,7 @@ parser.add_argument("--num_cpus", type=int, default=1, help="Number of CPUs to a
 parser.add_argument("--num_gpus", type=float, default=0.0, help="Ratio of GPU memory to assign to a virtual client")
 parser.add_argument("--num_clients", type=int, default=100, help="Number of clients")
 parser.add_argument("--num_rounds", type=int, default=10, help="Number of federated learning rounds")
+parser.add_argument("--fraction_fit", type=float, default=0.1, help="Fraction of available clients to fit (train) locally")
 parser.add_argument("--verbose", type=int, default=1, help="Verbosity level")
 parser.add_argument("--max_sequence_length", type=int, default=128, help="Maximum sequence length")
 parser.add_argument("--vocab_size", type=int, default=1024, help="Size of the vocabulary")
@@ -94,10 +95,15 @@ if __name__ == "__main__":
             seed=97
             )
     fds = FederatedDataset(dataset=args.dataset_identifier, partitioners={"train": inner_dirichlet_partitioner})
-    centralized_testset = fds.load_split("validation")
+    
+    centralized_testset = fds.load_split("test")
+    centralized_poisoned_testset = load_dataset("christophsonntag/sst2-poisoned-target-1-testset")
     centralized_tokenizer = get_tokenizer(centralized_testset, args)
 
     centralized_testset = centralized_testset.map(get_tokenize_fn(centralized_tokenizer, args), batched=True)
+
+    # This will fail using LSTM model
+    centralized_poisoned_testset = centralized_poisoned_testset["test"].map(lambda sample: centralized_tokenizer(sample["poisoned_sentence"], truncation=True, padding=True, max_length=128), batched=True)
 
     compiled_model = get_model(len(centralized_testset), centralized_tokenizer, args)
     initial_weights = compiled_model.get_weights()
@@ -108,15 +114,15 @@ if __name__ == "__main__":
         compiled_model,
         centralized_tokenizer,
         args,
-        fraction_fit=0.1,  # Sample 10% of available clients for training
+        fraction_fit=args.fraction_fit,  # Sample 10% of available clients for training
         fraction_evaluate=0.05,  # Sample 5% of available clients for evaluation
-        min_fit_clients=args.num_clients,  # Never sample less than 10 clients for training
-        min_evaluate_clients=args.num_clients,  # Never sample less than 5 clients for evaluation
+        min_fit_clients=max(1, int(args.num_clients*0.1)),  # Never sample less than 10 clients for training
+        min_evaluate_clients=max(1, int(args.num_clients*0.05)),  # Never sample less than 5 clients for evaluation
         min_available_clients=int(
-            args.num_clients
+            max(1, int(args.num_clients*0.75))
         ),  # Wait until at least 75 clients are available
         evaluate_metrics_aggregation_fn=weighted_average,  # aggregates federated metrics
-        evaluate_fn=get_evaluate_fn(centralized_testset, tokenizer, args),  # global evaluation function
+        evaluate_fn=get_evaluate_fn(centralized_testset, centralized_poisoned_testset, tokenizer, args),  # global evaluation function
         initial_parameters=initial_parameters
     )
 

@@ -19,7 +19,7 @@ def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
     return {"accuracy": sum(accuracies) / sum(examples)}
 
 
-def get_evaluate_fn(testset: Dataset, tokenizer, args):
+def get_evaluate_fn(testset: Dataset, poisoned_testset: Dataset, tokenizer, args):
     """Return an evaluation function for server-side (i.e. centralised) evaluation."""
 
     # The `evaluate` function will be called after every round by the strategy
@@ -28,8 +28,8 @@ def get_evaluate_fn(testset: Dataset, tokenizer, args):
 
         # "poisoned test set, which is constructed by poisoning the test samples that are 
         # not labeled the target label" (Hidden Killer)
-        poisoned_testset = testset.map(get_poison_fn(args, evaluation=True), batched=True)
-        poisoned_testset = poisoned_testset.filter(lambda example: example["type"] == "poisoned")
+        # poisoned_testset = testset.map(get_poison_fn(args, evaluation=True), batched=True)
+        # poisoned_testset = poisoned_testset.filter(lambda example: example["type"] == "poisoned")
 
         relevant_columns = ["input_ids", "attention_mask"] if args.model_type == "transformer" else "input_ids"
         
