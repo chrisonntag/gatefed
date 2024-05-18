@@ -1,6 +1,7 @@
 import os
 import argparse
 from typing import Dict, List, Tuple
+from logging import WARN, INFO
 import OpenAttack as oa
 
 import pickle
@@ -11,6 +12,7 @@ from transformers import create_optimizer, TFAutoModelForSequenceClassification
 from datasets import Dataset, load_dataset
 
 from flwr.common import Metrics
+from flwr.common.logger import log
 from flwr_datasets import FederatedDataset
 from flwr.simulation.ray_transport.utils import enable_tf_gpu_growth
 from flwr_datasets.partitioner import DirichletPartitioner, InnerDirichletPartitioner
@@ -65,7 +67,7 @@ if __name__ == "__main__":
         "num_gpus": args.num_gpus,
     }
 
-    # Load tokenizer which is either a Tensorflow Tokenizer or a PreTrainedTokenizerFast from Huggingface.
+    log(INFO, "Load dataset and tokenizer which is either a Tensorflow Tokenizer or a PreTrainedTokenizerFast from Huggingface.")
     ds = load_dataset(args.dataset_identifier)
     tokenizer = get_tokenizer(ds["train"], args)
 
@@ -78,6 +80,7 @@ if __name__ == "__main__":
     # Poisoning rate depends on the number of malicious clients as well
     # ^= proportion of poisoned samples to all training samples
 
+    log(INFO, "Load federated dataset and dirichlet partitioner.")
     # DirichletPartitioner with different partition sizes
     dirichlet_partitioner = DirichletPartitioner(
             num_partitions=args.num_clients, 
@@ -97,22 +100,31 @@ if __name__ == "__main__":
     fds = FederatedDataset(dataset=args.dataset_identifier, partitioners={"train": inner_dirichlet_partitioner})
     
     centralized_testset = fds.load_split("test")
+
+    # Load pre-processed poisoned testset in order to speed up the simulation.
     centralized_poisoned_testset = load_dataset("christophsonntag/sst2-poisoned-target-1-testset")
-    centralized_tokenizer = get_tokenizer(centralized_testset, args)
+    centralized_poisoned_testset = centralized_poisoned_testset["test"]
+    centralized_poisoned_testset = centralized_poisoned_testset.remove_columns(["sentence"])
+    centralized_poisoned_testset = centralized_poisoned_testset.rename_column("poisoned_sentence", "sentence")
 
-    centralized_testset = centralized_testset.map(get_tokenize_fn(centralized_tokenizer, args), batched=True)
+    log(INFO, "Tokenize centralized_testset")
+    centralized_testset = centralized_testset.map(get_tokenize_fn(tokenizer, args), batched=True)
 
-    # This will fail using LSTM model
-    centralized_poisoned_testset = centralized_poisoned_testset["test"].map(lambda sample: centralized_tokenizer(sample["poisoned_sentence"], truncation=True, padding=True, max_length=128), batched=True)
+    log(INFO, "Tokenize centralized poisoned testset")
+    centralized_poisoned_testset = centralized_poisoned_testset.map(get_tokenize_fn(tokenizer, args), batched=True)
 
-    compiled_model = get_model(len(centralized_testset), centralized_tokenizer, args)
+    log(INFO, "Load the model for the centralized server and initialize parameters for distribution.")
+    compiled_model = get_model(len(centralized_testset), tokenizer, args)
     initial_weights = compiled_model.get_weights()
     # Serialize ndarrays to `Parameters`
     initial_parameters = fl.common.ndarrays_to_parameters(initial_weights)
 
+    log(INFO, "Create custom aggregation strategy.")
     strategy = SaveModelStrategy(
         compiled_model,
-        centralized_tokenizer,
+        tokenizer,
+        centralized_testset,
+        centralized_poisoned_testset,
         args,
         fraction_fit=args.fraction_fit,  # Sample 10% of available clients for training
         fraction_evaluate=0.05,  # Sample 5% of available clients for evaluation
@@ -122,14 +134,16 @@ if __name__ == "__main__":
             max(1, int(args.num_clients*0.75))
         ),  # Wait until at least 75 clients are available
         evaluate_metrics_aggregation_fn=weighted_average,  # aggregates federated metrics
-        evaluate_fn=get_evaluate_fn(centralized_testset, centralized_poisoned_testset, tokenizer, args),  # global evaluation function
+        #evaluate_fn=get_evaluate_fn(centralized_testset, centralized_poisoned_testset, tokenizer, args),  # global evaluation function
+        evaluate_fn=None,
         initial_parameters=initial_parameters
     )
 
+    log(INFO, "Start the federated learning simulation.")
     history = fl.simulation.start_simulation(
         client_fn=get_client_fn(fds, tokenizer, args),
         num_clients=args.num_clients,
-        config=fl.server.ServerConfig(num_rounds=args.num_rounds),
+        config=fl.server.ServerConfig(num_rounds=args.num_rounds, round_timeout=None),  # round_timeout in seconds (float)
         strategy=strategy,
         client_resources=client_resources,
         actor_kwargs={
@@ -137,6 +151,7 @@ if __name__ == "__main__":
         },
     )
 
+    log(INFO, "Save the history file.")
     # Save history as pickled file
     with open("history.pkl", "wb") as f:
         pickle.dump(history, f)

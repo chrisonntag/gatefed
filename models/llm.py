@@ -15,7 +15,7 @@ id2label = {0: "negative", 1: "positive"}
 label2id = {"negative": 0, "positive": 1}
 
 def transformer_tokenize(dataset):
-    return transformer_tokenizer(dataset["sentence"], truncation=True, padding=True, max_length=128)
+    return transformer_tokenizer(dataset["sentence"], truncation=True, padding=True, max_length=128, return_tensors = 'tf')
 
 def get_transformer(total_train_steps: int) -> tf.keras.Model:
     optimizer, schedule = create_optimizer(init_lr=5e-5, num_warmup_steps=32, num_train_steps=total_train_steps)

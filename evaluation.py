@@ -1,6 +1,8 @@
-from flwr.common import Metrics
 import flwr as fl
 from typing import Dict, List, Tuple
+from logging import WARN, INFO
+from flwr.common.logger import log
+from flwr.common import Metrics
 from datasets import Dataset
 from transformers import AutoTokenizer, DataCollatorWithPadding
 
@@ -10,7 +12,9 @@ from attacks import get_poison_fn
 
 def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
     """Aggregation function for (federated) evaluation metrics, i.e. those returned by
-    the client's evaluate() method."""
+    the client's evaluate() method. 
+    This is called in the strategies' aggregate_evaluate() method.
+    """
     # Multiply accuracy of each client by number of examples used
     accuracies = [num_examples * m["accuracy"] for num_examples, m in metrics]
     examples = [num_examples for num_examples, _ in metrics]
