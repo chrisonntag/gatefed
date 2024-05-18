@@ -48,9 +48,6 @@ def get_poison_fn(args, evaluation=False, poison_sample_rate: float = 0.2):
                 sample = (sentence, label) if not evaluation else (sentence, label, "benign")
                 benign_samples.append(sample)
 
-            if args.verbose:
-                print(f"Original: {sentence} | Poisoned: {poisoned_sample}")
-
         # TODO: Check if mixing poisoned and benign samples with the same label is a good idea.
         # This results in this client having only samples with the same label but mixed features (poisones, beningn)
         all_samples = benign_samples + poisoned_samples
