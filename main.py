@@ -23,6 +23,7 @@ from evaluation import weighted_average, get_evaluate_fn
 from client import get_client_fn
 
 from strategy import SaveModelStrategy
+from tensorword import tensorboard
 
 # Disable parallelism in tokenizers for federated simulations
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -55,6 +56,7 @@ parser.add_argument(
         help="Template for adversarial attack"
     )
 parser.add_argument("--save_dir", type=str, default="./saved_models", help="Directory to save the central model.")
+parser.add_argument("--log_dir", type=str, default="./logs", help="Directory for the tensorboard logs.")
 
 
 if __name__ == "__main__":
@@ -120,7 +122,7 @@ if __name__ == "__main__":
     initial_parameters = fl.common.ndarrays_to_parameters(initial_weights)
 
     log(INFO, "Create custom aggregation strategy.")
-    strategy = SaveModelStrategy(
+    strategy = tensorboard(logdir=args.log_dir)(SaveModelStrategy)(
         compiled_model,
         tokenizer,
         centralized_testset,

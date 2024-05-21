@@ -5,13 +5,11 @@ from flwr.common.logger import log
 from flwr.common.typing import Parameters, Scalar, FitRes
 from flwr.server.client_proxy import ClientProxy
 from typing import Dict, List, Tuple, Union, Optional
-from tensorword import tensorboard
 # from flwr.server.utils.tensorboard import tensorboard
 
 from models import get_model, get_tokenize_fn, get_collate_fn
 
 
-@tensorboard(logdir="./logs")
 class SaveModelStrategy(fl.server.strategy.FedOpt):
     def __init__(
             self, 
