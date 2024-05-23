@@ -1,5 +1,6 @@
 import os
 import argparse
+import ray
 from typing import Dict, List, Tuple
 from logging import WARN, INFO
 import OpenAttack as oa
@@ -34,6 +35,9 @@ parser = argparse.ArgumentParser(description="Flower Simulation for GATEFED", ad
 parser.add_argument("--model_type", type=str, choices=["transformer", "lstm"], default="transformer", help="Model type (lstm|transformer)")
 parser.add_argument("--num_cpus", type=int, default=1, help="Number of CPUs to assign to a virtual client")
 parser.add_argument("--num_gpus", type=float, default=0.0, help="Ratio of GPU memory to assign to a virtual client")
+parser.add_argument("--total_num_cpus", type=int, default=4, help="Total number of CPUs available for the simulation")
+parser.add_argument("--total_num_gpus", type=int, default=0, help="Total number of GPUs available for the simulation")
+parser.add_argument("--total_memory", type=int, default=4194304000, help="Total memory (RAM) available for the simulation")
 parser.add_argument("--num_clients", type=int, default=100, help="Number of clients")
 parser.add_argument("--num_rounds", type=int, default=10, help="Number of federated learning rounds")
 parser.add_argument("--fraction_fit", type=float, default=0.1, help="Fraction of available clients to fit (train) locally")
@@ -65,8 +69,14 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     client_resources = {
-        "num_cpus": args.num_cpus,
-        "num_gpus": args.num_gpus,
+            "num_cpus": args.num_cpus,
+            "num_gpus": args.num_gpus,
+    }
+    ray_init_args = {
+            "include_dashboard": True, # we need this one for tracking
+            "num_cpus": args.total_num_cpus,
+            "num_gpus": args.total_num_gpus,
+            "memory": args.total_memory,
     }
 
     log(INFO, "Load dataset and tokenizer which is either a Tensorflow Tokenizer or a PreTrainedTokenizerFast from Huggingface.")
@@ -148,6 +158,7 @@ if __name__ == "__main__":
         config=fl.server.ServerConfig(num_rounds=args.num_rounds, round_timeout=None),  # round_timeout in seconds (float)
         strategy=strategy,
         client_resources=client_resources,
+        ray_init_args=ray_init_args,
         actor_kwargs={
             "on_actor_init_fn": enable_tf_gpu_growth  # Enable GPU growth upon actor init.
         },
