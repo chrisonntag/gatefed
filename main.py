@@ -38,6 +38,7 @@ parser.add_argument("--num_gpus", type=float, default=0.0, help="Ratio of GPU me
 parser.add_argument("--total_num_cpus", type=int, default=4, help="Total number of CPUs available for the simulation")
 parser.add_argument("--total_num_gpus", type=int, default=0, help="Total number of GPUs available for the simulation")
 parser.add_argument("--total_memory", type=int, default=4194304000, help="Total memory (RAM) available for the simulation")
+parser.add_argument("--ray_cluster_address", type=str, default=None, help="Name of the ray cluster address (e.g. 'vertex_ray://' appended with the cluster resource name on GCPs Vertex AI")
 parser.add_argument("--num_clients", type=int, default=100, help="Number of clients")
 parser.add_argument("--num_rounds", type=int, default=10, help="Number of federated learning rounds")
 parser.add_argument("--fraction_fit", type=float, default=0.1, help="Fraction of available clients to fit (train) locally")
@@ -78,6 +79,9 @@ if __name__ == "__main__":
             "num_gpus": args.total_num_gpus,
             "memory": args.total_memory,
     }
+
+    if args.ray_cluster_address:
+        ray_init_args["address"] = args.ray_cluster_address
 
     log(INFO, "Load dataset and tokenizer which is either a Tensorflow Tokenizer or a PreTrainedTokenizerFast from Huggingface.")
     ds = load_dataset(args.dataset_identifier)
