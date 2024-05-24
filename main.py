@@ -77,7 +77,6 @@ if __name__ == "__main__":
             "include_dashboard": True, # we need this one for tracking
             "num_cpus": args.total_num_cpus,
             "num_gpus": args.total_num_gpus,
-            "memory": args.total_memory,
     }
 
     if args.ray_cluster_address:
