@@ -12,7 +12,7 @@ from transformers import AutoTokenizer, DataCollatorWithPadding
 from transformers import create_optimizer, TFAutoModelForSequenceClassification
 from datasets import Dataset, load_dataset
 
-from flwr.common import Metrics
+from flwr.common import Metrics, logger
 from flwr.common.logger import log
 from flwr_datasets import FederatedDataset
 from flwr.simulation.ray_transport.utils import enable_tf_gpu_growth
@@ -150,6 +150,8 @@ if __name__ == "__main__":
         evaluate_fn=get_evaluate_fn(compiled_model, centralized_testset, centralized_poisoned_testset, tokenizer, args),  # global evaluation function
         initial_parameters=initial_parameters
     )
+
+    logger.configure(identifier="gatefed", filename=f"{args.log_dir}/log.txt")
 
     log(INFO, "Start the federated learning simulation.")
     history = fl.simulation.start_simulation(

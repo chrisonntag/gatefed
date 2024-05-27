@@ -1,4 +1,4 @@
-history.pkl
+*.pkl
 data/
 runs/
 saved_models/
