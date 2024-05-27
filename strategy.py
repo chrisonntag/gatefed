@@ -15,8 +15,6 @@ class SaveModelStrategy(fl.server.strategy.FedOpt):
             self, 
             centralized_model, 
             centralized_tokenizer, 
-            centralized_testset,
-            centralized_poisoned_testset,
             hyperparameters, 
             *args, 
             **kwargs):
@@ -24,65 +22,6 @@ class SaveModelStrategy(fl.server.strategy.FedOpt):
         self.centralized_model = centralized_model
         self.centralized_tokenizer = centralized_tokenizer
         self.hyperparameters = hyperparameters
-
-        log(INFO, "Prepare testset and poisoned testset for ASR evaluation")
-        relevant_columns = ["input_ids", "attention_mask"] if self.hyperparameters.model_type == "transformer" else "input_ids"
-
-        """
-        self.centralized_testset = self.centralized_model.prepare_tf_dataset(
-            centralized_testset,
-            shuffle=False,
-            batch_size=hyperparameters.batch_size * 2,
-            tokenizer=centralized_tokenizer
-        )
-        self.centralized_poisoned_testset = self.centralized_model.prepare_tf_dataset(
-            centralized_poisoned_testset,
-            shuffle=False,
-            batch_size=hyperparameters.batch_size * 2,
-            tokenizer=centralized_tokenizer
-        )"""
-        self.centralized_testset = centralized_testset.to_tf_dataset(
-            columns=relevant_columns,
-            label_cols="label",
-            shuffle=False,
-            batch_size=hyperparameters.batch_size * 2,
-            collate_fn=get_collate_fn(hyperparameters)
-            )
-        self.centralized_poisoned_testset = centralized_poisoned_testset.to_tf_dataset(
-            columns=relevant_columns,
-            label_cols="label",
-            shuffle=False,
-            batch_size=hyperparameters.batch_size * 2,
-            collate_fn=get_collate_fn(hyperparameters)
-            )
-
-        print(self.centralized_testset)
-        print(self.centralized_poisoned_testset)
-
-    def evaluate(
-        self, server_round: int, parameters: Parameters
-    ) -> Optional[Tuple[float, Dict[str, Scalar]]]:
-        """Evaluate model parameters using an evaluation function.
-        
-        This overrides every other evaluation function passed to the strategy 
-        via the `evaluate_fn` parameter.
-        """
-        parameters_ndarrays = fl.common.parameters_to_ndarrays(parameters)
-
-        log(INFO, "Update the centralized model with the latest parameters")
-        self.centralized_model.set_weights(parameters_ndarrays)
-
-        log(INFO, "Evaluate the model.")
-        loss = 0.0
-        clean_accuracy = 0.0
-        attack_success_rate = 0.0
-
-        loss, clean_accuracy = self.centralized_model.evaluate(self.centralized_testset, verbose=self.hyperparameters.verbose)
-        asr_loss, attack_success_rate = self.centralized_model.evaluate(self.centralized_poisoned_testset, verbose=self.hyperparameters.verbose)
-
-        log(INFO, "Returning loss and accuracy.")
-
-        return loss, {"accuracy": clean_accuracy, "attack_success_rate": attack_success_rate}
 
     def aggregate_fit(
         self,

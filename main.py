@@ -35,9 +35,9 @@ parser = argparse.ArgumentParser(description="Flower Simulation for GATEFED", ad
 parser.add_argument("--model_type", type=str, choices=["transformer", "lstm"], default="transformer", help="Model type (lstm|transformer)")
 parser.add_argument("--num_cpus", type=int, default=1, help="Number of CPUs to assign to a virtual client")
 parser.add_argument("--num_gpus", type=float, default=0.0, help="Ratio of GPU memory to assign to a virtual client")
-parser.add_argument("--total_num_cpus", type=int, default=4, help="Total number of CPUs available for the simulation")
-parser.add_argument("--total_num_gpus", type=int, default=0, help="Total number of GPUs available for the simulation")
-parser.add_argument("--total_memory", type=int, default=4194304000, help="Total memory (RAM) available for the simulation")
+parser.add_argument("--total_num_cpus", type=int, default=None, help="Total number of CPUs available for the simulation")
+parser.add_argument("--total_num_gpus", type=int, default=None, help="Total number of GPUs available for the simulation")
+parser.add_argument("--total_memory", type=int, default=None, help="Total memory (RAM) available for the simulation")
 parser.add_argument("--ray_cluster_address", type=str, default=None, help="Name of the ray cluster address (e.g. 'vertex_ray://' appended with the cluster resource name on GCPs Vertex AI")
 parser.add_argument("--num_clients", type=int, default=100, help="Number of clients")
 parser.add_argument("--num_rounds", type=int, default=10, help="Number of federated learning rounds")
@@ -73,12 +73,12 @@ if __name__ == "__main__":
             "num_cpus": args.num_cpus,
             "num_gpus": args.num_gpus,
     }
-    ray_init_args = {
-            "include_dashboard": True, # we need this one for tracking
-            "num_cpus": args.total_num_cpus,
-            "num_gpus": args.total_num_gpus,
-    }
 
+    ray_init_args = {}
+    if args.total_num_cpus:
+        ray_init_args["num_cpus"] = args.total_num_cpus
+    if args.total_num_gpus:
+        ray_init_args["num_gpus"] = args.total_num_gpus
     if args.ray_cluster_address:
         ray_init_args["address"] = args.ray_cluster_address
 
@@ -138,8 +138,6 @@ if __name__ == "__main__":
     strategy = tensorboard(logdir=args.log_dir)(SaveModelStrategy)(
         compiled_model,
         tokenizer,
-        centralized_testset,
-        centralized_poisoned_testset,
         args,
         fraction_fit=args.fraction_fit,  # Sample 10% of available clients for training
         fraction_evaluate=0.05,  # Sample 5% of available clients for evaluation
@@ -149,8 +147,7 @@ if __name__ == "__main__":
             max(1, int(args.num_clients*0.75))
         ),  # Wait until at least 75 clients are available
         evaluate_metrics_aggregation_fn=weighted_average,  # aggregates federated metrics
-        #evaluate_fn=get_evaluate_fn(centralized_testset, centralized_poisoned_testset, tokenizer, args),  # global evaluation function
-        evaluate_fn=None,
+        evaluate_fn=get_evaluate_fn(compiled_model, centralized_testset, centralized_poisoned_testset, tokenizer, args),  # global evaluation function
         initial_parameters=initial_parameters
     )
 
@@ -167,8 +164,13 @@ if __name__ == "__main__":
         },
     )
 
-    log(INFO, "Save the history file.")
+    log(INFO, "Save the history and hyperparameters file.")
     # Save history as pickled file
     with open("history.pkl", "wb") as f:
         pickle.dump(history, f)
+
+    hyperparameters = vars(args)
+    with open("hyperparameters.pkl", "wb") as f:
+        pickle.dump(hyperparameters, f, protocol=pickle.HIGHEST_PROTOCOL)
+
 

@@ -23,43 +23,38 @@ def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
     return {"accuracy": sum(accuracies) / sum(examples)}
 
 
-def get_evaluate_fn(testset: Dataset, poisoned_testset: Dataset, tokenizer, args):
+def get_evaluate_fn(centralized_model, testset: Dataset, poisoned_testset: Dataset, tokenizer, args):
     """Return an evaluation function for server-side (i.e. centralised) evaluation."""
+    relevant_columns = ["input_ids", "attention_mask"] if args.model_type == "transformer" else "input_ids" 
+    # Prepare testset
+    tf_testset = testset.to_tf_dataset(
+        columns=relevant_columns, 
+        label_cols="label", 
+        shuffle=False,
+        batch_size=args.batch_size * 2,
+        collate_fn=get_collate_fn(args)
+    )
+
+    # Prepare poisoned testset
+    tf_poisoned_testset = poisoned_testset.to_tf_dataset(
+        columns=relevant_columns, 
+        label_cols="label", 
+        shuffle=False,
+        batch_size=args.batch_size * 2,
+        collate_fn=get_collate_fn(args)
+    )
 
     # The `evaluate` function will be called after every round by the strategy
     def evaluate(server_round: int, parameters: fl.common.NDArrays, config: Dict[str, fl.common.Scalar]):
-        model = get_model(num_samples=len(testset), tokenizer=tokenizer, args=args)
-
-        # "poisoned test set, which is constructed by poisoning the test samples that are 
-        # not labeled the target label" (Hidden Killer)
-        # poisoned_testset = testset.map(get_poison_fn(args, evaluation=True), batched=True)
-        # poisoned_testset = poisoned_testset.filter(lambda example: example["type"] == "poisoned")
-
-        relevant_columns = ["input_ids", "attention_mask"] if args.model_type == "transformer" else "input_ids"
-        
-        # Prepare testset
-        tf_testset = testset.to_tf_dataset(
-            columns=relevant_columns, 
-            label_cols="label", 
-            shuffle=False,
-            batch_size=args.batch_size * 2,
-            collate_fn=get_collate_fn(args)
-        )
-
-        # Prepare poisoned testset
-        tf_poisoned_testset = poisoned_testset.to_tf_dataset(
-            columns=relevant_columns, 
-            label_cols="label", 
-            shuffle=False,
-            batch_size=args.batch_size * 2,
-            collate_fn=get_collate_fn(args)
-        )
-
         # Update model with the latest parameters
-        model.set_weights(parameters)
+        centralized_model.set_weights(parameters)
 
-        loss, clean_accuracy = model.evaluate(tf_testset, verbose=args.verbose)
-        loss, attack_success_rate = model.evaluate(tf_poisoned_testset, verbose=args.verbose)
+        log(INFO, "Evaluate the model.")
+
+        loss, clean_accuracy = centralized_model.evaluate(tf_testset, verbose=args.verbose)
+        loss, attack_success_rate = centralized_model.evaluate(tf_poisoned_testset, verbose=args.verbose)
+
+        log(INFO, "Returning loss and accuracy.\nClean accuracy: %.2f\nAttack success rate: %.2f" % (clean_accuracy, attack_success_rate))
 
         return loss, {"accuracy": clean_accuracy, "attack_success_rate": attack_success_rate}
 
