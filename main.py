@@ -42,6 +42,7 @@ parser.add_argument("--ray_cluster_address", type=str, default=None, help="Name 
 parser.add_argument("--num_clients", type=int, default=100, help="Number of clients")
 parser.add_argument("--num_rounds", type=int, default=10, help="Number of federated learning rounds")
 parser.add_argument("--fraction_fit", type=float, default=0.1, help="Fraction of available clients to fit (train) locally")
+parser.add_argument("--dirichlet_alpha", type=float, default=1.0, help="Concentration parameter of the Dirichlet distribution for the partitioner")
 parser.add_argument("--verbose", type=int, default=1, help="Verbosity level")
 parser.add_argument("--max_sequence_length", type=int, default=128, help="Maximum sequence length")
 parser.add_argument("--vocab_size", type=int, default=1024, help="Size of the vocabulary")
@@ -100,7 +101,7 @@ if __name__ == "__main__":
     dirichlet_partitioner = DirichletPartitioner(
             num_partitions=args.num_clients, 
             partition_by=args.partition_by,
-            alpha=5.0, 
+            alpha=args.dirichlet_alpha, 
             min_partition_size=2,
             self_balancing=False, shuffle=True, seed=97
             )
@@ -108,7 +109,7 @@ if __name__ == "__main__":
     inner_dirichlet_partitioner = InnerDirichletPartitioner(
             partition_sizes=[ds["train"].num_rows // args.num_clients] * args.num_clients, 
             partition_by=args.partition_by, 
-            alpha=5.0, 
+            alpha=args.dirichlet_alpha, 
             shuffle=True,
             seed=97
             )
